@@ -125,8 +125,8 @@ def analyze_operation(command: str, platform: str, device: str, is_device: bool,
 
     global retry, reboot, android_connectivity_verified
 
-    # Kill the simulator when we fail to launch the app
-    if exit_code == 80: # APP_CRASH
+    # Apps crashing can be infra failures, retry except on Apple devices where retries can be costly due to small queue size
+    if exit_code == 80 and not (platform == "apple" and is_device): # APP_CRASH
         print(f'    Application crashed - if persist, please investigate system logs from the run')
         retry = True
         reboot = True
@@ -361,15 +361,15 @@ if retry:
     request_infra_retry('Requesting work item retry because an infrastructure issue was detected on this machine')
 
     # TODO https://github.com/dotnet/core-eng/issues/15059
-    # We need to remove testResults.xml so that it is not uploaded since this run will be discarded
+    # We need to rename testResults.xml so that test results are not uploaded since this run will be discarded
     # This is a workaround until we make AzDO reporter not upload test results
     file_name = "testResults.xml"
     test_results = os.path.join(output_directory, file_name)
     if os.path.exists(test_results):
-        os.remove(test_results)
+        os.rename(test_results, test_results + ".retry")
 
     if os.path.exists(file_name):
-        os.remove(file_name)
+        os.rename(file_name, file_name + ".retry")
 
 if reboot:
     send_metric(REBOOT_METRIC_NAME, reboot_exit_code, reboot_dimensions, event_type=EVENT_TYPE)
